@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Posts | Pat Thontirawong</title>
+    <link>https://pipatth.github.io/post/</link>
+      <atom:link href="https://pipatth.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+    <description>Posts</description>
+    <generator>Source Themes Academic (https://sourcethemes.com/academic/)</generator><language>en-us</language><lastBuildDate>Tue, 13 Aug 2019 16:31:50 -0400</lastBuildDate>
+    <image>
+      <url>https://pipatth.github.io/img/icon-192.png</url>
+      <title>Posts</title>
+      <link>https://pipatth.github.io/post/</link>
+    </image>
+    
+    <item>
+      <title>Building a bot to trade foreign currency using reinforcement learning (Part 2)</title>
+      <link>https://pipatth.github.io/post/ppo2-currency-trader-part2/</link>
+      <pubDate>Tue, 13 Aug 2019 16:31:50 -0400</pubDate>
+      <guid>https://pipatth.github.io/post/ppo2-currency-trader-part2/</guid>
+      <description>&lt;p&gt;In &lt;a href=&#34;https://pipatth.github.io/post/ppo2-currency-trader-part2/&#34;&gt;Part1&lt;/a&gt;, we configured OANDA v20 and downloaded data to train our agent. Today, we are going to build a custom OpenAI Gym environment.&lt;/p&gt;
+&lt;p&gt;Check out my full codes on &lt;a href=&#34;https://github.com/pipatth/PPO2-currency-trader&#34;&gt;GitHub&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Gym is an open-sourced tool to train your reinforcement learning agent. Think of Gym as a training ground. The agent send an action to the environment. The environment processes it and reply with the next observation and reward. This cycle goes on until the training session (episode) ends.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://gym.openai.com/assets/docs/aeloop-138c89d44114492fd02822303e6b4b07213010bb14ca5856d2d49d6b62d88e53.svg&#34; alt=&#34;RL cycle&#34;&gt;&lt;/p&gt;
+&lt;p&gt;source: &lt;a href=&#34;https://gym.openai.com/docs/&#34;&gt;https://gym.openai.com/docs/&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Gym provides many pre-built environments from the basic ones such as &lt;code&gt;CartPole-v0&lt;/code&gt; to Atari old video games. Although Gym doesn&amp;rsquo;t provide a pre-built environment for currency trading, we can get one by creating a subclass of &lt;code&gt;gym.Env&lt;/code&gt; class.&lt;/p&gt;
+&lt;p&gt;But first we need to install Gym:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ pip install gym
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;Before we start building an environment, let&amp;rsquo;s understand how &lt;code&gt;gym.Env&lt;/code&gt; class works. Adam King did a very good job explaining each method &lt;a href=&#34;https://towardsdatascience.com/creating-a-custom-openai-gym-environment-for-stock-trading-be532be3910e&#34;&gt;here&lt;/a&gt;. My code is based on his. More details about Gym can be found on Gym documentation &lt;a href=&#34;https://gym.openai.com/docs/&#34;&gt;here&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Basically, there are two public methods that you need to write:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;reset()&lt;/code&gt;. This gets called when you want to start a new session.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;step(action)&lt;/code&gt;. You call this one when your agent takes an action.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Note: There is also a &lt;code&gt;render()&lt;/code&gt; method but we skip it for now because we don&amp;rsquo;t need to show anything on the screen.&lt;/p&gt;
+&lt;p&gt;A simple run of &lt;code&gt;CartPole-v0&lt;/code&gt; looks like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;import gym
+env = gym.make(&#39;CartPole-v0&#39;)
+env.reset() # reset environment to start a session
+for _ in range(1000): # run for 1,000 steps
+    env.step(1) # take action 1
+env.close()
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;Easy, right? Let&amp;rsquo;s put a currency trading touch to it.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;__init__()&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;We&amp;rsquo;re going to initialize the environment with the data that we downloaded from &lt;a href=&#34;https://pipatth.github.io/post/ppo2-currency-trader-part2/&#34;&gt;Part1&lt;/a&gt;. We also need to add common parameters such as commission (good if we want to use the code in stock trading), slippage, and the maximum number of steps that a session is going to run.&lt;/p&gt;
+&lt;p&gt;Currency trading is a little different from stock or Bitcoin. You have a regulatory margin requirement. OANDA published margin percentage and a guide how it calculates margin closeout &lt;a href=&#34;https://oanda.secure.force.com/AnswersSupport?urlName=How-to-Calculate-a-Margin-Closeout-1436196462931&amp;amp;language=en_US#one&#34;&gt;here&lt;/a&gt;. In our case, I set margin requirement to 100% (i.e. you need to have equity to cover 100% of your position)&lt;/p&gt;
+&lt;p&gt;An &lt;code&gt;action_space&lt;/code&gt; has two elements. One has three choices whether we &lt;code&gt;long&lt;/code&gt;, &lt;code&gt;short&lt;/code&gt;, &lt;code&gt;close all positions&lt;/code&gt;, or &lt;code&gt;hold&lt;/code&gt;. The other is the proportion that we long or short (based on total margin available). This can range from 1/10, 2/10, to 10/10.&lt;/p&gt;
+&lt;p&gt;To make it easy to report portfolio performance, I define the size of &lt;code&gt;account_history&lt;/code&gt; dataframe to 5 columns. We&amp;rsquo;ll send out net asset value &lt;code&gt;nav&lt;/code&gt;, units long/short, and proceeds in a pandas dataframe later.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# init
+def __init__(
+    self,
+    df,
+    commission=0.0,
+    margin_req=1.00,
+    closeout_req=0.5,
+    slippage=0.0,
+    initial=100000,
+    serial=False,
+    max_steps=200,
+):
+    super(TradeEnv, self).__init__()
+    self.lookback_sz = 24
+    self.commission = commission
+    self.margin_req = margin_req
+    self.closeout_req = closeout_req
+    self.slippage = slippage
+    self.initial = initial
+    self.serial = serial
+    self.max_steps = max_steps
+    self.colTime = &amp;quot;time&amp;quot;
+    self.cols = {
+        &amp;quot;volume&amp;quot;: &amp;quot;volume&amp;quot;,
+        &amp;quot;ask&amp;quot;: &amp;quot;ask.c&amp;quot;,
+        &amp;quot;bid&amp;quot;: &amp;quot;bid.c&amp;quot;,
+        &amp;quot;open&amp;quot;: &amp;quot;mid.o&amp;quot;,
+        &amp;quot;high&amp;quot;: &amp;quot;mid.h&amp;quot;,
+        &amp;quot;low&amp;quot;: &amp;quot;mid.l&amp;quot;,
+        &amp;quot;close&amp;quot;: &amp;quot;mid.c&amp;quot;,
+    }
+    self.ac_cols = [&amp;quot;nav&amp;quot;, &amp;quot;unit_long&amp;quot;, &amp;quot;value_long&amp;quot;, &amp;quot;unit_short&amp;quot;, &amp;quot;value_short&amp;quot;]
+    self.df = df.dropna().sort_values(self.colTime)
+    self.action_space = spaces.MultiDiscrete([4, 10])
+    self.df_sz = self.df.shape[1] - 1
+    self.observation_space = spaces.Box(
+        low=0,
+        high=1,
+        shape=(self.df_sz + len(self.ac_cols), self.lookback_sz + 1),
+        dtype=np.float16,
+    )
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;&lt;strong&gt;&lt;code&gt;reset()&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;reset()&lt;/code&gt; job is to set &lt;code&gt;balance&lt;/code&gt; to the seed money that we give the agent. The &lt;code&gt;units_open&lt;/code&gt; and &lt;code&gt;prices_open&lt;/code&gt; lists are queues to keep track of positions that we have. OANDA requires a FIFO (first-in, first-out) so for example, if you are closing half of your current position, OANDA will close the oldest one first.&lt;/p&gt;
+&lt;p&gt;We call &lt;code&gt;_reset_pos()&lt;/code&gt; private method (details &lt;a href=&#34;https://github.com/pipatth/PPO2-currency-trader/blob/master/env.py&#34;&gt;here&lt;/a&gt;) to find the starting position of the dataframe. Remember that we have 30,000 training data points in Part1? This method randomly pick one starting point from that.&lt;/p&gt;
+&lt;p&gt;As I mentioned earlier, we create three pandas dataframes to help us track and report trades, prices, and the account.&lt;/p&gt;
+&lt;p&gt;At the end of the method, it&amp;rsquo;s a convention in Gym to get the next observation and pass it out. We call a &lt;code&gt;_next_obs()&lt;/code&gt; method.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# reset
+def reset(self):
+    self.balance = self.initial
+    self.units_open = []  # FIFO queue
+    self.prices_open = []
+    self._reset_pos()
+
+    # account history df
+    ac_array = np.repeat([[self.initial, 0, 0, 0, 0]], self.lookback_sz + 1, axis=0)
+    self.ac_hist = pd.DataFrame(ac_array, columns=self.ac_cols)
+
+    # price history df
+    pr_cols = [self.cols[k] for k in self.cols.keys()]
+    self.pr_hist = self.df.loc[
+        self.start_pos - self.lookback_sz : self.start_pos, pr_cols
+    ]
+    self.pr_hist.columns = [k for k in self.cols.keys()]
+
+    # trade history df
+    tr_cols = [&amp;quot;step&amp;quot;, &amp;quot;type&amp;quot;, &amp;quot;unit&amp;quot;, &amp;quot;total&amp;quot;]
+    self.tr_hist = pd.DataFrame(None, columns=tr_cols)
+
+    return self._next_obs()
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;&lt;strong&gt;&lt;code&gt;_next_obs()&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;_next_obs()&lt;/code&gt; get observation (aka information) and pass it to the agent. Our agent will use this information as an input and come up with the next action. We can get creative with technical indicators (see &lt;a href=&#34;https://www.ta-lib.org/&#34;&gt;https://www.ta-lib.org/&lt;/a&gt;) but let&amp;rsquo;s keep things simple for now with OHLCV (&amp;ldquo;open&amp;rdquo;, &amp;ldquo;high&amp;rdquo;, &amp;ldquo;low&amp;rdquo;, &amp;ldquo;close&amp;rdquo;, &amp;ldquo;volume&amp;rdquo;) and account history.&lt;/p&gt;
+&lt;p&gt;Similar to other neural networks, most algorithms run better when we scale the data.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# get next obs
+def _next_obs(self):
+    # OHLCV info
+    end = self.current_step + self.lookback_sz + 1
+    pr_hist = (
+        self.active_df.iloc[self.current_step : end]
+        .drop(self.colTime, axis=1)
+        .values
+    )
+    obs = preprocessing.StandardScaler().fit_transform(pr_hist).T
+
+    # append scaled history
+    scaled_hist = preprocessing.MinMaxScaler().fit_transform(self.ac_hist.T)
+    obs = np.append(obs, scaled_hist[:, -(self.lookback_sz + 1) :], axis=0)
+    return obs
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;&lt;strong&gt;&lt;code&gt;step(action)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;This method is called every time the agent is taking an action. After taking an action (&lt;code&gt;_take_action&lt;/code&gt; method), we move &lt;code&gt;current_step&lt;/code&gt; forward and inform the agent the reward and the next observation. One thing to note here is we force sell if episode ends.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# take a step forward
+def step(self, action):
+    nav_beg = self.get_nav()
+    pr_row = self._get_pr_row()
+    self._take_action(action, pr_row)
+    self.remaining_steps -= 1
+    self.current_step += 1
+    # end of episode, force close
+    if self.remaining_steps == 0:
+        unit_to_close = -sum(self.units_open)  # reverse to close
+        if unit_to_close &amp;gt; 0:
+            price = pr_row[&amp;quot;ask&amp;quot;]
+            self._close_pos(unit_to_close, price)
+        elif unit_to_close &amp;lt; 0:
+            price = pr_row[&amp;quot;bid&amp;quot;]
+            self._close_pos(unit_to_close, price)
+        self._reset_pos()
+    obs = self._next_obs()
+    reward = self.get_nav() - nav_beg
+    done = self._is_closeout()
+
+    # append next price to pr_hist
+    pr_cols = [self.cols[k] for k in self.cols.keys()]
+    pr_next = self.df.loc[self.start_pos + self.current_step, pr_cols]
+    pr_next.index = [k for k in self.cols.keys()]
+    self.pr_hist = self.pr_hist.append(pd.DataFrame(pr_next).T)
+
+    return obs, reward, done, {}
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;&lt;strong&gt;&lt;code&gt;_take_action(action, pr_row)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Instead of just long/short/close/hold, we have to be careful of the imposed margin requirement. &lt;code&gt;avail&lt;/code&gt; indicates how much margin we have available after subtracting margin used by the positions that we already opened.&lt;/p&gt;
+&lt;p&gt;Note: I didn&amp;rsquo;t store margin used and NAV but wrote few private methods to compute them from positions opened.&lt;/p&gt;
+&lt;p&gt;If an action is to close all positions (&lt;code&gt;action_type == 2&lt;/code&gt;), we don&amp;rsquo;t need to care about margin, just reverse the number of units that we have and close them using the right bid/ask. Notice that we apply slippage here.&lt;/p&gt;
+&lt;p&gt;If an action is either &lt;code&gt;0&lt;/code&gt; or &lt;code&gt;1&lt;/code&gt; which mean &lt;code&gt;long&lt;/code&gt; or &lt;code&gt;short&lt;/code&gt;, we check how many units we can take based on available margin. We need to round up the units to whole numbers here.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# action
+def _take_action(self, action, pr_row):
+    action_type = action[0]
+    proportion = action[1] / 10
+    avail = self.get_nav() - self._get_margin_used()  # margin available to use
+    unit_filled = 0
+    price = 0
+    # close
+    if action_type == 2:
+        unit = -sum(self.units_open)
+        if unit &amp;gt; 0:
+            price = pr_row[&amp;quot;ask&amp;quot;] * (1 + self.slippage)
+        else:
+            price = pr_row[&amp;quot;bid&amp;quot;] * (1 - self.slippage)
+        unit_filled = self._close_pos(unit, price)
+    # take pos
+    elif avail &amp;gt; 0:
+        # long
+        if action_type == 0:
+            price = pr_row[&amp;quot;ask&amp;quot;] * (1 + self.slippage)
+            unit = int(avail / price * proportion)  # unit to long
+            unit_filled = self._open_pos(unit, price)
+        # short
+        elif action_type == 1:
+            price = pr_row[&amp;quot;bid&amp;quot;] * (1 - self.slippage)
+            unit = -int(avail / price * proportion)  # unit to short
+            unit_filled = self._open_pos(unit, price)
+
+    # record trade history
+    if unit_filled != 0:
+        tr = pd.DataFrame(
+            [
+                [
+                    self.start_pos + self.current_step,
+                    &amp;quot;long&amp;quot; if unit_filled &amp;gt; 0 else &amp;quot;short&amp;quot;,
+                    unit_filled,
+                    unit_filled * price,
+                ]
+            ],
+            columns=self.tr_hist.columns,
+        )
+        self.tr_hist = self.tr_hist.append(tr, ignore_index=True)
+
+    # record account history
+    if unit_filled &amp;gt; 0:
+        unit_long = abs(unit_filled)
+        unit_short = 0
+    elif unit_filled &amp;lt; 0:
+        unit_long = 0
+        unit_short = abs(unit_filled)
+    else:
+        unit_long = 0
+        unit_short = 0
+    df_ = pd.DataFrame(
+        [
+            [
+                self.get_nav(),
+                unit_long,
+                unit_long * price,
+                unit_short,
+                unit_short * price,
+            ]
+        ],
+        columns=self.ac_hist.columns,
+    )
+    self.ac_hist = pd.concat([self.ac_hist, df_], ignore_index=True)
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;&lt;strong&gt;&lt;code&gt;get_summary()&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Lastly, we add another public method to get a summary of the account and the prices in pandas dataframe. This also make it easy to update metrics such as Sharpe or maximum drawdown later as the agent trades.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# get summary
+def get_summary(self):
+    accounts = self.ac_hist.reset_index(drop=True)
+    prices = self.pr_hist.reset_index(drop=True)
+    accounts[&amp;quot;gl&amp;quot;] = accounts[&amp;quot;nav&amp;quot;].diff().fillna(0)
+    accounts[&amp;quot;ret&amp;quot;] = (accounts[&amp;quot;gl&amp;quot;] / accounts[&amp;quot;nav&amp;quot;].shift(1)).fillna(0)
+    return pd.concat([prices, accounts], axis=1)
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;Voila! we have a trading environment. We can start training our bot in Part3.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Building a bot to trade foreign currency using reinforcement learning (Part 1)</title>
+      <link>https://pipatth.github.io/post/ppo2-currency-trader-part1/</link>
+      <pubDate>Mon, 12 Aug 2019 15:28:41 -0400</pubDate>
+      <guid>https://pipatth.github.io/post/ppo2-currency-trader-part1/</guid>
+      <description>&lt;p&gt;Today we&amp;rsquo;re going to build an environment to train a reinforcement learning agent to trade foreign currency. We&amp;rsquo;ll be using OpenAI Gym as our tool. Gym custom environment is very flexible to set up and you can apply the idea into other reinforcement learning projects.&lt;/p&gt;
+&lt;p&gt;So here&amp;rsquo;s the list of what we&amp;rsquo;re going to do:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Set up OANDA v20 to download data from OANDA (Part1)&lt;/li&gt;
+&lt;li&gt;Write an OpenAI Gym to simulate the foreign exchange market (Part2)&lt;/li&gt;
+&lt;li&gt;Train an agent to trade using &lt;a href=&#34;https://openai.com/blog/openai-baselines-ppo/&#34;&gt;Proximal Policy Optimization&lt;/a&gt; algorithm (Part3)&lt;/li&gt;
+&lt;li&gt;See how the agent performs on &lt;a href=&#34;https://dash.plot.ly/&#34;&gt;Dash&lt;/a&gt; app (Part3)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You can clone my code on &lt;a href=&#34;https://github.com/pipatth/PPO2-currency-trader&#34;&gt;GitHub&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;So here we go.&lt;/p&gt;
+&lt;p&gt;Let&amp;rsquo;s begin by setting up an OANDA API so we can download historical data from OANDA. You can go to OANDA and sign up for a free FXTrade Practice account &lt;a href=&#34;https://www1.oanda.com/register/#/sign-up/demo&#34;&gt;here&lt;/a&gt;. After you&amp;rsquo;re done, OANDA will give you token information. You&amp;rsquo;ll need to put the information in your .v20.conf file in your &lt;code&gt;$HOME&lt;/code&gt; directory.&lt;/p&gt;
+&lt;p&gt;Something like this:
+&lt;script type=&#34;application/javascript&#34; src=&#34;https://gist.github.com/pipatth/2c04cf6e393388651cb4ac38dddd8000.js?file=.v20.conf&#34;&gt;&lt;/script&gt;
+&lt;/p&gt;
+&lt;p&gt;OANDA provides a python library called &lt;a href=&#34;https://github.com/oanda/v20-python&#34;&gt;v20&lt;/a&gt;. With this library, we don&amp;rsquo;t have to write our own HTTP calls. Let&amp;rsquo;s clone and install that on your virualenv environment. We also gonna need pandas and PyYAML&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ pip install v20 pandas PyYAML
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;You can also use v20 for live trading (if your bot find golden nuggets!!!). The documentation &lt;a href=&#34;https://developer.oanda.com/rest-live-v20/introduction/&#34;&gt;here&lt;/a&gt; is quite comprehensive.&lt;/p&gt;
+&lt;p&gt;But for now, let&amp;rsquo;s write some python to get historical data.&lt;/p&gt;
+&lt;p&gt;First, we read the config file &lt;code&gt;.v20.conf&lt;/code&gt; from our &lt;code&gt;$HOME&lt;/code&gt; path and create an API context. OANDA needs this to verify our accounts.&lt;/p&gt;
+&lt;p&gt;Then, we write a function &lt;code&gt;get_hourly_candle&lt;/code&gt; to get &lt;code&gt;n&lt;/code&gt; data points from OANDA. I stick with hourly data, but you can change the granularity to download daily, monthly, or even 5-second data. Let&amp;rsquo;s do &lt;code&gt;BAM&lt;/code&gt; to get &amp;lsquo;bid&amp;rsquo;, &amp;lsquo;ask&amp;rsquo;, and &amp;lsquo;mid&amp;rsquo; points.&lt;/p&gt;
+&lt;p&gt;Because OANDA allows maximum 5,000 bars per HTTP call, we need to write a loop to download data in chunks smaller than 5,000. The function &lt;code&gt;get_data&lt;/code&gt; did just that. We then concatenate, reset index, and save data to a tab-delimited file.&lt;/p&gt;
+&lt;script type=&#34;application/javascript&#34; src=&#34;https://gist.github.com/pipatth/2c04cf6e393388651cb4ac38dddd8000.js?file=data.py&#34;&gt;&lt;/script&gt;
+
+&lt;p&gt;So if you call &lt;code&gt;get_data&lt;/code&gt; function like below, you should get 30,000 bars of data&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;get_data(&amp;quot;EUR_USD&amp;quot;, &amp;quot;2014-01-01&amp;quot;, 30000, &amp;quot;EUR_USD_train.tsv&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;We also want to download some data to test the agent. This so-called &amp;lsquo;testing&amp;rsquo; dataset should not be the same as the one we use to train the agent&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;get_data(&amp;quot;EUR_USD&amp;quot;, &amp;quot;2019-01-01&amp;quot;, 2000, &amp;quot;EUR_USD_test.tsv&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;So now we have some data. They should look something like this:
+&lt;script type=&#34;application/javascript&#34; src=&#34;https://gist.github.com/pipatth/2c04cf6e393388651cb4ac38dddd8000.js?file=EUR_USD_train.tsv&#34;&gt;&lt;/script&gt;
+&lt;/p&gt;
+&lt;p&gt;Now we&amp;rsquo;re ready to build a trading environment. Part2 &lt;a href=&#34;https://pipatth.github.io/post/ppo2-currency-trader-part2/&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Note: I used EUR_USD and GBP_USD as examples here. It&amp;rsquo;s easier to work when you have a quote in your home currency. If your home currency is USD but you&amp;rsquo;re trying to do USD_JPY or USD_CAD, just be careful.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

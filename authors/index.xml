@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Authors | Pat Thontirawong</title>
+    <link>https://pipatth.github.io/authors/</link>
+      <atom:link href="https://pipatth.github.io/authors/index.xml" rel="self" type="application/rss+xml" />
+    <description>Authors</description>
+    <generator>Source Themes Academic (https://sourcethemes.com/academic/)</generator><language>en-us</language>
+    <image>
+      <url>https://pipatth.github.io/img/icon-192.png</url>
+      <title>Authors</title>
+      <link>https://pipatth.github.io/authors/</link>
+    </image>
+    
+    <item>
+      <title></title>
+      <link>https://pipatth.github.io/authors/admin/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>https://pipatth.github.io/authors/admin/</guid>
+      <description>&lt;p&gt;I am a machine learning engineer at Data Revenue GmbH. I designed and developed end-to-end machine learning systems for medical researchers. I am also a founder of Dataginjo LLC where I worked with clients in online education and recreation industries to apply machine learning and predictive modeling in marketing and operation areas. My interests include reinforcement learning and time-series forecasting.&lt;/p&gt;
+&lt;p&gt;Before moving to the U.S., I worked with VNET Venture Capital, one of the leading venture capital management companies in Thailand. My focus was on identifying investment opportunities in IT, retail, healthcare, and food industries.&lt;/p&gt;
+&lt;p&gt;I published research articles on Quantitative Finance and Review of Quantitative Finance and Accounting. But now I am focusing on artificial intelligence in marketing.&lt;/p&gt;
+&lt;p&gt;I enjoy beer, cooking, SCUBA diving, and looking at soccer stats&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

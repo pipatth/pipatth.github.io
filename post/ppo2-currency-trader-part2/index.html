@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="generator" content="Source Themes Academic 4.4.0">
+
+  
+
+  
+  
+  
+  
+  
+    
+    
+    
+  
+  
+
+  <meta name="author" content="Pat Thontirawong">
+
+  
+  
+  
+    
+  
+  <meta name="description" content="In Part1, we configured OANDA v20 and downloaded data to train our agent. Today, we are going to build a custom OpenAI Gym environment.
+Check out my full codes on GitHub.
+Gym is an open-sourced tool to train your reinforcement learning agent. Think of Gym as a training ground. The agent send an action to the environment. The environment processes it and reply with the next observation and reward. This cycle goes on until the training session (episode) ends.">
+
+  
+  <link rel="alternate" hreflang="en-us" href="https://pipatth.github.io/post/ppo2-currency-trader-part2/">
+
+  
+
+
+  
+
+  
+  
+  
+  <meta name="theme-color" content="#4caf50">
+  
+
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.8.6/css/academicons.min.css" integrity="sha256-uFVgMKfistnJAfoCUQigIl+JfUaP47GrRKjf6CTPVmw=" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.0/css/all.css" integrity="sha384-aOkxzJ5uQz7WBObEZcHvV5JvRW3TUc2rNPA7pe3AwnsUohiw1Vj2Rgx2KSOkF5+h" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.css" integrity="sha256-ygkqlh3CYSUri3LhQxzdcm0n1EQvH2Y+U5S2idbLtxs=" crossorigin="anonymous">
+
+    
+    
+    
+      
+    
+    
+      
+      
+        
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/styles/github.min.css" crossorigin="anonymous" title="hl-light">
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/styles/dracula.min.css" crossorigin="anonymous" title="hl-dark" disabled>
+        
+      
+    
+
+    
+
+    
+
+  
+
+  
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat:400,700|Roboto:400,400italic,700|Roboto+Mono&display=swap">
+  
+
+  
+  
+  
+  <link rel="stylesheet" href="/css/academic.min.c7977d91c78688217455b0fd1a1ad966.css">
+
+  
+
+  
+  
+  
+
+  
+
+  <link rel="manifest" href="/index.webmanifest">
+  <link rel="icon" type="image/png" href="/img/icon-32.png">
+  <link rel="apple-touch-icon" type="image/png" href="/img/icon-192.png">
+
+  <link rel="canonical" href="https://pipatth.github.io/post/ppo2-currency-trader-part2/">
+
+  
+  
+  
+  
+    
+    
+  
+  
+  <meta property="twitter:card" content="summary">
+  
+  <meta property="og:site_name" content="Pat Thontirawong">
+  <meta property="og:url" content="https://pipatth.github.io/post/ppo2-currency-trader-part2/">
+  <meta property="og:title" content="Building a bot to trade foreign currency using reinforcement learning (Part 2) | Pat Thontirawong">
+  <meta property="og:description" content="In Part1, we configured OANDA v20 and downloaded data to train our agent. Today, we are going to build a custom OpenAI Gym environment.
+Check out my full codes on GitHub.
+Gym is an open-sourced tool to train your reinforcement learning agent. Think of Gym as a training ground. The agent send an action to the environment. The environment processes it and reply with the next observation and reward. This cycle goes on until the training session (episode) ends."><meta property="og:image" content="https://pipatth.github.io/img/icon-192.png">
+  <meta property="twitter:image" content="https://pipatth.github.io/img/icon-192.png"><meta property="og:locale" content="en-us">
+  
+    
+      <meta property="article:published_time" content="2019-08-13T16:31:50-04:00">
+    
+    <meta property="article:modified_time" content="2019-08-13T16:31:50-04:00">
+  
+
+  
+
+
+  
+
+
+
+
+
+  <title>Building a bot to trade foreign currency using reinforcement learning (Part 2) | Pat Thontirawong</title>
+
+</head>
+
+<body id="top" data-spy="scroll" data-offset="70" data-target="#TableOfContents" >
+
+  <aside class="search-results" id="search">
+  <div class="container">
+    <section class="search-header">
+
+      <div class="row no-gutters justify-content-between mb-3">
+        <div class="col-6">
+          <h1>Search</h1>
+        </div>
+        <div class="col-6 col-search-close">
+          <a class="js-search" href="#"><i class="fas fa-times-circle text-muted" aria-hidden="true"></i></a>
+        </div>
+      </div>
+
+      <div id="search-box">
+        
+        <input name="q" id="search-query" placeholder="Search..." autocapitalize="off"
+        autocomplete="off" autocorrect="off" spellcheck="false" type="search">
+        
+      </div>
+
+    </section>
+    <section class="section-search-results">
+
+      <div id="search-hits">
+        
+      </div>
+
+    </section>
+  </div>
+</aside>
+
+
+  
+<nav class="navbar navbar-light fixed-top navbar-expand-lg py-0 compensate-for-scrollbar" id="navbar-main">
+  <div class="container">
+
+    
+      <a class="navbar-brand" href="/">Pat Thontirawong</a>
+      
+      <button type="button" class="navbar-toggler" data-toggle="collapse"
+              data-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
+        <span><i class="fas fa-bars"></i></span>
+      </button>
+      
+
+    
+    <div class="collapse navbar-collapse" id="navbar">
+
+      
+      
+      <ul class="navbar-nav mr-auto">
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+        
+        
+        
+        
+        
+          
+          
+          
+            
+          
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#about"><span>Home</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+        
+        
+        
+        
+        
+          
+          
+          
+            
+          
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#experience"><span>Experience</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+        
+        
+        
+        
+        
+          
+          
+          
+            
+          
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#posts"><span>Posts</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+        
+        
+        
+        
+        
+          
+          
+          
+            
+          
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#accomplishments"><span>Publications</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+        
+        
+        
+        
+        
+          
+          
+          
+            
+          
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#contact"><span>Contact</span></a>
+        </li>
+
+        
+        
+
+      
+      </ul>
+      <ul class="navbar-nav ml-auto">
+      
+
+        
+
+        
+        <li class="nav-item">
+          <a class="nav-link js-search" href="#"><i class="fas fa-search" aria-hidden="true"></i></a>
+        </li>
+        
+
+        
+
+        
+        <li class="nav-item">
+          <a class="nav-link js-dark-toggle" href="#"><i class="fas fa-moon" aria-hidden="true"></i></a>
+        </li>
+        
+
+      </ul>
+
+    </div>
+  </div>
+</nav>
+
+
+  <article class="article" itemscope itemtype="http://schema.org/Article">
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+  
+  
+<div class="article-container pt-3">
+  <h1 itemprop="name">Building a bot to trade foreign currency using reinforcement learning (Part 2)</h1>
+
+  
+  <p class="page-subtitle">We&rsquo;ll create a OpenAI Gym environment to train a currency trading bot</p>
+  
+
+  
+    
+
+
+
+<meta content="2019-08-13 16:31:50 -0400 EDT" itemprop="datePublished">
+<meta content="2019-08-13 16:31:50 -0400 EDT" itemprop="dateModified">
+
+<div class="article-metadata">
+
+  
+  
+
+  
+  <span class="article-date">
+    
+    
+      
+    
+    <time>Aug 13, 2019</time>
+  </span>
+  
+
+  
+
+  
+  <span class="middot-divider"></span>
+  <span class="article-reading-time">
+    7 min read
+  </span>
+  
+
+  
+  
+  
+
+  
+  
+
+  
+    
+<div class="share-box" aria-hidden="true">
+  <ul class="share">
+    
+      
+      
+      
+        
+      
+      
+      
+      <li>
+        <a href="https://twitter.com/intent/tweet?url=https://pipatth.github.io/post/ppo2-currency-trader-part2/&amp;text=Building%20a%20bot%20to%20trade%20foreign%20currency%20using%20reinforcement%20learning%20%28Part%202%29" target="_blank" rel="noopener" class="share-btn-twitter">
+          <i class="fab fa-twitter"></i>
+        </a>
+      </li>
+    
+      
+      
+      
+        
+      
+      
+      
+      <li>
+        <a href="https://www.facebook.com/sharer.php?u=https://pipatth.github.io/post/ppo2-currency-trader-part2/&amp;t=Building%20a%20bot%20to%20trade%20foreign%20currency%20using%20reinforcement%20learning%20%28Part%202%29" target="_blank" rel="noopener" class="share-btn-facebook">
+          <i class="fab fa-facebook-f"></i>
+        </a>
+      </li>
+    
+      
+      
+      
+        
+      
+      
+      
+      <li>
+        <a href="mailto:?subject=Building%20a%20bot%20to%20trade%20foreign%20currency%20using%20reinforcement%20learning%20%28Part%202%29&amp;body=https://pipatth.github.io/post/ppo2-currency-trader-part2/" target="_blank" rel="noopener" class="share-btn-email">
+          <i class="fas fa-envelope"></i>
+        </a>
+      </li>
+    
+      
+      
+      
+        
+      
+      
+      
+      <li>
+        <a href="https://www.linkedin.com/shareArticle?url=https://pipatth.github.io/post/ppo2-currency-trader-part2/&amp;title=Building%20a%20bot%20to%20trade%20foreign%20currency%20using%20reinforcement%20learning%20%28Part%202%29" target="_blank" rel="noopener" class="share-btn-linkedin">
+          <i class="fab fa-linkedin-in"></i>
+        </a>
+      </li>
+    
+      
+      
+      
+        
+      
+      
+      
+      <li>
+        <a href="https://web.whatsapp.com/send?text=Building%20a%20bot%20to%20trade%20foreign%20currency%20using%20reinforcement%20learning%20%28Part%202%29%20https://pipatth.github.io/post/ppo2-currency-trader-part2/" target="_blank" rel="noopener" class="share-btn-whatsapp">
+          <i class="fab fa-whatsapp"></i>
+        </a>
+      </li>
+    
+      
+      
+      
+        
+      
+      
+      
+      <li>
+        <a href="https://service.weibo.com/share/share.php?url=https://pipatth.github.io/post/ppo2-currency-trader-part2/&amp;title=Building%20a%20bot%20to%20trade%20foreign%20currency%20using%20reinforcement%20learning%20%28Part%202%29" target="_blank" rel="noopener" class="share-btn-weibo">
+          <i class="fab fa-weibo"></i>
+        </a>
+      </li>
+    
+  </ul>
+</div>
+
+
+  
+
+</div>
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+</div>
+
+
+
+  <div class="article-container">
+
+    <div class="article-style" itemprop="articleBody">
+      <p>In <a href="https://pipatth.github.io/post/ppo2-currency-trader-part2/">Part1</a>, we configured OANDA v20 and downloaded data to train our agent. Today, we are going to build a custom OpenAI Gym environment.</p>
+<p>Check out my full codes on <a href="https://github.com/pipatth/PPO2-currency-trader">GitHub</a>.</p>
+<p>Gym is an open-sourced tool to train your reinforcement learning agent. Think of Gym as a training ground. The agent send an action to the environment. The environment processes it and reply with the next observation and reward. This cycle goes on until the training session (episode) ends.</p>
+<p><img src="https://gym.openai.com/assets/docs/aeloop-138c89d44114492fd02822303e6b4b07213010bb14ca5856d2d49d6b62d88e53.svg" alt="RL cycle"></p>
+<p>source: <a href="https://gym.openai.com/docs/">https://gym.openai.com/docs/</a></p>
+<p>Gym provides many pre-built environments from the basic ones such as <code>CartPole-v0</code> to Atari old video games. Although Gym doesn&rsquo;t provide a pre-built environment for currency trading, we can get one by creating a subclass of <code>gym.Env</code> class.</p>
+<p>But first we need to install Gym:</p>
+<pre><code>$ pip install gym
+</code></pre><p>Before we start building an environment, let&rsquo;s understand how <code>gym.Env</code> class works. Adam King did a very good job explaining each method <a href="https://towardsdatascience.com/creating-a-custom-openai-gym-environment-for-stock-trading-be532be3910e">here</a>. My code is based on his. More details about Gym can be found on Gym documentation <a href="https://gym.openai.com/docs/">here</a></p>
+<p>Basically, there are two public methods that you need to write:</p>
+<ul>
+<li><code>reset()</code>. This gets called when you want to start a new session.</li>
+<li><code>step(action)</code>. You call this one when your agent takes an action.</li>
+</ul>
+<p>Note: There is also a <code>render()</code> method but we skip it for now because we don&rsquo;t need to show anything on the screen.</p>
+<p>A simple run of <code>CartPole-v0</code> looks like this:</p>
+<pre><code>import gym
+env = gym.make('CartPole-v0')
+env.reset() # reset environment to start a session
+for _ in range(1000): # run for 1,000 steps
+    env.step(1) # take action 1
+env.close()
+</code></pre><p>Easy, right? Let&rsquo;s put a currency trading touch to it.</p>
+<p><strong><code>__init__()</code></strong></p>
+<p>We&rsquo;re going to initialize the environment with the data that we downloaded from <a href="https://pipatth.github.io/post/ppo2-currency-trader-part2/">Part1</a>. We also need to add common parameters such as commission (good if we want to use the code in stock trading), slippage, and the maximum number of steps that a session is going to run.</p>
+<p>Currency trading is a little different from stock or Bitcoin. You have a regulatory margin requirement. OANDA published margin percentage and a guide how it calculates margin closeout <a href="https://oanda.secure.force.com/AnswersSupport?urlName=How-to-Calculate-a-Margin-Closeout-1436196462931&amp;language=en_US#one">here</a>. In our case, I set margin requirement to 100% (i.e. you need to have equity to cover 100% of your position)</p>
+<p>An <code>action_space</code> has two elements. One has three choices whether we <code>long</code>, <code>short</code>, <code>close all positions</code>, or <code>hold</code>. The other is the proportion that we long or short (based on total margin available). This can range from 1/10, 2/10, to 10/10.</p>
+<p>To make it easy to report portfolio performance, I define the size of <code>account_history</code> dataframe to 5 columns. We&rsquo;ll send out net asset value <code>nav</code>, units long/short, and proceeds in a pandas dataframe later.</p>
+<pre><code># init
+def __init__(
+    self,
+    df,
+    commission=0.0,
+    margin_req=1.00,
+    closeout_req=0.5,
+    slippage=0.0,
+    initial=100000,
+    serial=False,
+    max_steps=200,
+):
+    super(TradeEnv, self).__init__()
+    self.lookback_sz = 24
+    self.commission = commission
+    self.margin_req = margin_req
+    self.closeout_req = closeout_req
+    self.slippage = slippage
+    self.initial = initial
+    self.serial = serial
+    self.max_steps = max_steps
+    self.colTime = &quot;time&quot;
+    self.cols = {
+        &quot;volume&quot;: &quot;volume&quot;,
+        &quot;ask&quot;: &quot;ask.c&quot;,
+        &quot;bid&quot;: &quot;bid.c&quot;,
+        &quot;open&quot;: &quot;mid.o&quot;,
+        &quot;high&quot;: &quot;mid.h&quot;,
+        &quot;low&quot;: &quot;mid.l&quot;,
+        &quot;close&quot;: &quot;mid.c&quot;,
+    }
+    self.ac_cols = [&quot;nav&quot;, &quot;unit_long&quot;, &quot;value_long&quot;, &quot;unit_short&quot;, &quot;value_short&quot;]
+    self.df = df.dropna().sort_values(self.colTime)
+    self.action_space = spaces.MultiDiscrete([4, 10])
+    self.df_sz = self.df.shape[1] - 1
+    self.observation_space = spaces.Box(
+        low=0,
+        high=1,
+        shape=(self.df_sz + len(self.ac_cols), self.lookback_sz + 1),
+        dtype=np.float16,
+    )
+</code></pre><p><strong><code>reset()</code></strong></p>
+<p><code>reset()</code> job is to set <code>balance</code> to the seed money that we give the agent. The <code>units_open</code> and <code>prices_open</code> lists are queues to keep track of positions that we have. OANDA requires a FIFO (first-in, first-out) so for example, if you are closing half of your current position, OANDA will close the oldest one first.</p>
+<p>We call <code>_reset_pos()</code> private method (details <a href="https://github.com/pipatth/PPO2-currency-trader/blob/master/env.py">here</a>) to find the starting position of the dataframe. Remember that we have 30,000 training data points in Part1? This method randomly pick one starting point from that.</p>
+<p>As I mentioned earlier, we create three pandas dataframes to help us track and report trades, prices, and the account.</p>
+<p>At the end of the method, it&rsquo;s a convention in Gym to get the next observation and pass it out. We call a <code>_next_obs()</code> method.</p>
+<pre><code># reset
+def reset(self):
+    self.balance = self.initial
+    self.units_open = []  # FIFO queue
+    self.prices_open = []
+    self._reset_pos()
+
+    # account history df
+    ac_array = np.repeat([[self.initial, 0, 0, 0, 0]], self.lookback_sz + 1, axis=0)
+    self.ac_hist = pd.DataFrame(ac_array, columns=self.ac_cols)
+
+    # price history df
+    pr_cols = [self.cols[k] for k in self.cols.keys()]
+    self.pr_hist = self.df.loc[
+        self.start_pos - self.lookback_sz : self.start_pos, pr_cols
+    ]
+    self.pr_hist.columns = [k for k in self.cols.keys()]
+
+    # trade history df
+    tr_cols = [&quot;step&quot;, &quot;type&quot;, &quot;unit&quot;, &quot;total&quot;]
+    self.tr_hist = pd.DataFrame(None, columns=tr_cols)
+
+    return self._next_obs()
+</code></pre><p><strong><code>_next_obs()</code></strong></p>
+<p><code>_next_obs()</code> get observation (aka information) and pass it to the agent. Our agent will use this information as an input and come up with the next action. We can get creative with technical indicators (see <a href="https://www.ta-lib.org/">https://www.ta-lib.org/</a>) but let&rsquo;s keep things simple for now with OHLCV (&ldquo;open&rdquo;, &ldquo;high&rdquo;, &ldquo;low&rdquo;, &ldquo;close&rdquo;, &ldquo;volume&rdquo;) and account history.</p>
+<p>Similar to other neural networks, most algorithms run better when we scale the data.</p>
+<pre><code># get next obs
+def _next_obs(self):
+    # OHLCV info
+    end = self.current_step + self.lookback_sz + 1
+    pr_hist = (
+        self.active_df.iloc[self.current_step : end]
+        .drop(self.colTime, axis=1)
+        .values
+    )
+    obs = preprocessing.StandardScaler().fit_transform(pr_hist).T
+
+    # append scaled history
+    scaled_hist = preprocessing.MinMaxScaler().fit_transform(self.ac_hist.T)
+    obs = np.append(obs, scaled_hist[:, -(self.lookback_sz + 1) :], axis=0)
+    return obs
+</code></pre><p><strong><code>step(action)</code></strong></p>
+<p>This method is called every time the agent is taking an action. After taking an action (<code>_take_action</code> method), we move <code>current_step</code> forward and inform the agent the reward and the next observation. One thing to note here is we force sell if episode ends.</p>
+<pre><code># take a step forward
+def step(self, action):
+    nav_beg = self.get_nav()
+    pr_row = self._get_pr_row()
+    self._take_action(action, pr_row)
+    self.remaining_steps -= 1
+    self.current_step += 1
+    # end of episode, force close
+    if self.remaining_steps == 0:
+        unit_to_close = -sum(self.units_open)  # reverse to close
+        if unit_to_close &gt; 0:
+            price = pr_row[&quot;ask&quot;]
+            self._close_pos(unit_to_close, price)
+        elif unit_to_close &lt; 0:
+            price = pr_row[&quot;bid&quot;]
+            self._close_pos(unit_to_close, price)
+        self._reset_pos()
+    obs = self._next_obs()
+    reward = self.get_nav() - nav_beg
+    done = self._is_closeout()
+
+    # append next price to pr_hist
+    pr_cols = [self.cols[k] for k in self.cols.keys()]
+    pr_next = self.df.loc[self.start_pos + self.current_step, pr_cols]
+    pr_next.index = [k for k in self.cols.keys()]
+    self.pr_hist = self.pr_hist.append(pd.DataFrame(pr_next).T)
+
+    return obs, reward, done, {}
+</code></pre><p><strong><code>_take_action(action, pr_row)</code></strong></p>
+<p>Instead of just long/short/close/hold, we have to be careful of the imposed margin requirement. <code>avail</code> indicates how much margin we have available after subtracting margin used by the positions that we already opened.</p>
+<p>Note: I didn&rsquo;t store margin used and NAV but wrote few private methods to compute them from positions opened.</p>
+<p>If an action is to close all positions (<code>action_type == 2</code>), we don&rsquo;t need to care about margin, just reverse the number of units that we have and close them using the right bid/ask. Notice that we apply slippage here.</p>
+<p>If an action is either <code>0</code> or <code>1</code> which mean <code>long</code> or <code>short</code>, we check how many units we can take based on available margin. We need to round up the units to whole numbers here.</p>
+<pre><code># action
+def _take_action(self, action, pr_row):
+    action_type = action[0]
+    proportion = action[1] / 10
+    avail = self.get_nav() - self._get_margin_used()  # margin available to use
+    unit_filled = 0
+    price = 0
+    # close
+    if action_type == 2:
+        unit = -sum(self.units_open)
+        if unit &gt; 0:
+            price = pr_row[&quot;ask&quot;] * (1 + self.slippage)
+        else:
+            price = pr_row[&quot;bid&quot;] * (1 - self.slippage)
+        unit_filled = self._close_pos(unit, price)
+    # take pos
+    elif avail &gt; 0:
+        # long
+        if action_type == 0:
+            price = pr_row[&quot;ask&quot;] * (1 + self.slippage)
+            unit = int(avail / price * proportion)  # unit to long
+            unit_filled = self._open_pos(unit, price)
+        # short
+        elif action_type == 1:
+            price = pr_row[&quot;bid&quot;] * (1 - self.slippage)
+            unit = -int(avail / price * proportion)  # unit to short
+            unit_filled = self._open_pos(unit, price)
+
+    # record trade history
+    if unit_filled != 0:
+        tr = pd.DataFrame(
+            [
+                [
+                    self.start_pos + self.current_step,
+                    &quot;long&quot; if unit_filled &gt; 0 else &quot;short&quot;,
+                    unit_filled,
+                    unit_filled * price,
+                ]
+            ],
+            columns=self.tr_hist.columns,
+        )
+        self.tr_hist = self.tr_hist.append(tr, ignore_index=True)
+
+    # record account history
+    if unit_filled &gt; 0:
+        unit_long = abs(unit_filled)
+        unit_short = 0
+    elif unit_filled &lt; 0:
+        unit_long = 0
+        unit_short = abs(unit_filled)
+    else:
+        unit_long = 0
+        unit_short = 0
+    df_ = pd.DataFrame(
+        [
+            [
+                self.get_nav(),
+                unit_long,
+                unit_long * price,
+                unit_short,
+                unit_short * price,
+            ]
+        ],
+        columns=self.ac_hist.columns,
+    )
+    self.ac_hist = pd.concat([self.ac_hist, df_], ignore_index=True)
+</code></pre><p><strong><code>get_summary()</code></strong></p>
+<p>Lastly, we add another public method to get a summary of the account and the prices in pandas dataframe. This also make it easy to update metrics such as Sharpe or maximum drawdown later as the agent trades.</p>
+<pre><code># get summary
+def get_summary(self):
+    accounts = self.ac_hist.reset_index(drop=True)
+    prices = self.pr_hist.reset_index(drop=True)
+    accounts[&quot;gl&quot;] = accounts[&quot;nav&quot;].diff().fillna(0)
+    accounts[&quot;ret&quot;] = (accounts[&quot;gl&quot;] / accounts[&quot;nav&quot;].shift(1)).fillna(0)
+    return pd.concat([prices, accounts], axis=1)
+</code></pre><p>Voila! we have a trading environment. We can start training our bot in Part3.</p>
+
+    </div>
+
+    
+
+
+    
+
+
+
+    
+      
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+  
+  
+    
+  
+  
+  <div class="media author-card" itemscope itemtype="http://schema.org/Person">
+    
+      
+      <img class="portrait mr-3" src="/authors/admin/avatar_hu415ce5b05892f4960ee159c81b6a13cb_41825_250x250_fill_q90_lanczos_center.jpg" itemprop="image" alt="Avatar">
+    
+
+    <div class="media-body">
+      <h5 class="card-title" itemprop="name"><a href="https://pipatth.github.io/">Pat Thontirawong</a></h5>
+      <h6 class="card-subtitle">Founder / Data Scientist</h6>
+      <p class="card-text" itemprop="description">Learning reinforcement learning and time-series forecasting. Soccer data nerd.</p>
+      <ul class="network-icon" aria-hidden="true">
+        
+          
+          
+          
+            
+          
+          
+          
+          
+          
+            
+          
+          <li>
+            <a itemprop="sameAs" href="/#contact" >
+              <i class="fas fa-envelope"></i>
+            </a>
+          </li>
+        
+          
+          
+          
+            
+          
+          
+          
+          
+          
+            
+          
+          <li>
+            <a itemprop="sameAs" href="https://www.linkedin.com/in/pipatth" target="_blank" rel="noopener">
+              <i class="fab fa-linkedin"></i>
+            </a>
+          </li>
+        
+          
+          
+          
+            
+          
+          
+          
+          
+          
+            
+          
+          <li>
+            <a itemprop="sameAs" href="https://github.com/pipatth" target="_blank" rel="noopener">
+              <i class="fab fa-github"></i>
+            </a>
+          </li>
+        
+          
+          
+          
+          
+          
+          
+          
+            
+          
+          <li>
+            <a itemprop="sameAs" href="/files/cv.pdf" >
+              <i class="ai ai-cv"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+
+
+      
+      
+    
+
+    
+
+    
+
+
+  </div>
+</article>
+
+      
+
+    
+    
+
+    
+    
+    
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.imagesloaded/4.1.4/imagesloaded.pkgd.min.js" integrity="sha256-lqvxZrPLtfffUl2G/e7szqSvPBILGbwmsGE1MKlOi0Q=" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.isotope/3.0.6/isotope.pkgd.min.js" integrity="sha256-CBrpuqrMhXwcLLUd5tvQ4euBHCdh7wGlDfNz8vbu/iI=" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.js" integrity="sha256-X5PoE3KU5l+JcX+w09p/wHl9AzK333C4hJ2I9S5mD4M=" crossorigin="anonymous"></script>
+
+      
+
+      
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js" integrity="sha256-aYTdUrn6Ow1DDgh5JTc3aDGnnju48y/1c8s1dgkYPQ8=" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/languages/r.min.js"></script>
+        
+      
+
+      
+      
+    
+
+    
+    
+
+    
+    
+    <script>hljs.initHighlightingOnLoad();</script>
+    
+
+    
+    
+    <script>
+      const search_index_filename = "/index.json";
+      const i18n = {
+        'placeholder': "Search...",
+        'results': "results found",
+        'no_results': "No results found"
+      };
+      const content_type = {
+        'post': "Posts",
+        'project': "Projects",
+        'publication' : "Publications",
+        'talk' : "Talks"
+        };
+    </script>
+    
+
+    
+    
+
+    
+    
+    <script id="search-hit-fuse-template" type="text/x-template">
+      <div class="search-hit" id="summary-{{key}}">
+      <div class="search-hit-content">
+        <div class="search-hit-name">
+          <a href="{{relpermalink}}">{{title}}</a>
+          <div class="article-metadata search-hit-type">{{type}}</div>
+          <p class="search-hit-description">{{snippet}}</p>
+        </div>
+      </div>
+      </div>
+    </script>
+    
+
+    
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/3.2.1/fuse.min.js" integrity="sha256-VzgmKYmhsGNNN4Ph1kMW+BjoYJM2jV5i4IlFoeZA9XI=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/jquery.mark.min.js" integrity="sha256-4HLtjeVgH0eIB3aZ9mLYF6E8oU5chNdjU6p6rrXpl9U=" crossorigin="anonymous"></script>
+    
+
+    
+    
+
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    
+    
+    
+    <script src="/js/academic.min.16bbb3750feb7244c9bc409a5a4fe678.js"></script>
+
+    
+
+
+
+
+
+
+  
+  <div class="container">
+    <footer class="site-footer">
+  
+
+  <p class="powered-by">
+    
+
+    Powered by the
+    <a href="https://sourcethemes.com/academic/" target="_blank" rel="noopener">Academic theme</a> for
+    <a href="https://gohugo.io" target="_blank" rel="noopener">Hugo</a>.
+
+    
+    <span class="float-right" aria-hidden="true">
+      <a href="#" id="back_to_top">
+        <span class="button_icon">
+          <i class="fas fa-chevron-up fa-2x"></i>
+        </span>
+      </a>
+    </span>
+    
+  </p>
+</footer>
+
+  </div>
+  
+
+  
+<div id="modal" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cite</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <pre><code class="tex hljs"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-primary my-1 js-copy-cite" href="#" target="_blank">
+          <i class="fas fa-copy"></i> Copy
+        </a>
+        <a class="btn btn-outline-primary my-1 js-download-cite" href="#" target="_blank">
+          <i class="fas fa-download"></i> Download
+        </a>
+        <div id="modal-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
